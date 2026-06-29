@@ -325,6 +325,11 @@ public class NovelRestController {
             return ResponseEntity.badRequest().body(Map.of("error", "This coupon is inactive."));
         }
 
+        User dbUser = userService.getUserById(loggedInUser.getId());
+        if (dbUser.getUsedCoupons().contains(coupon.getCode().toUpperCase().trim())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "You have already used this coupon."));
+        }
+
         // Check user restriction: email OR name
         if (coupon.getAssignedUserEmail() != null && !coupon.getAssignedUserEmail().isEmpty()) {
             String restricted = coupon.getAssignedUserEmail().trim().toLowerCase();
@@ -411,6 +416,9 @@ public class NovelRestController {
             if (couponOpt.isPresent()) {
                 Coupon coupon = couponOpt.get();
                 if (coupon.getActive()) {
+                    if (user.getUsedCoupons().contains(cleanCoupon)) {
+                        return ResponseEntity.badRequest().body(Map.of("error", "You have already used this coupon."));
+                    }
                     boolean restrictedMatched = true;
                     if (coupon.getAssignedUserEmail() != null && !coupon.getAssignedUserEmail().isEmpty()) {
                         String restricted = coupon.getAssignedUserEmail().trim().toLowerCase();
@@ -500,6 +508,9 @@ public class NovelRestController {
 
         // Mock Checkout Fallback
         user.setBalance((user.getBalance() != null ? user.getBalance() : 0) + amount);
+        if (cleanCoupon != null) {
+            user.getUsedCoupons().add(cleanCoupon);
+        }
         userService.updateUser(user);
         
         // Save the flake purchase record

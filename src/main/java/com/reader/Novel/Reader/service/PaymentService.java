@@ -143,6 +143,9 @@ public class PaymentService {
         User user = userService.getUserById(userId);
         if (user != null && user.getId() != null) {
             user.setBalance((user.getBalance() != null ? user.getBalance() : 0) + flakesAmount);
+            if (couponCode != null && !couponCode.trim().isEmpty()) {
+                user.getUsedCoupons().add(couponCode.trim().toUpperCase());
+            }
             userService.updateUser(user);
 
             FlakePurchase flakePurchase = new FlakePurchase();

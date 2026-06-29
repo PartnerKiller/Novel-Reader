@@ -30,6 +30,11 @@ public class User {
     private Boolean banned = false;
     private java.time.LocalDateTime timeoutUntil;
 
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "user_used_coupons", joinColumns = @JoinColumn(name = "user_id"))
+    @Column(name = "coupon_code")
+    private java.util.Set<String> usedCoupons = new java.util.HashSet<>();
+
     public User() {
 
     }
@@ -109,6 +114,17 @@ public class User {
 
     public java.time.LocalDateTime getTimeoutUntil() { return timeoutUntil; }
     public void setTimeoutUntil(java.time.LocalDateTime timeoutUntil) { this.timeoutUntil = timeoutUntil; }
+
+    public java.util.Set<String> getUsedCoupons() {
+        if (usedCoupons == null) {
+            usedCoupons = new java.util.HashSet<>();
+        }
+        return usedCoupons;
+    }
+
+    public void setUsedCoupons(java.util.Set<String> usedCoupons) {
+        this.usedCoupons = usedCoupons;
+    }
 
     @Override
     public String toString() {
