@@ -14,7 +14,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Override
     public void addInterceptors(org.springframework.web.servlet.config.annotation.InterceptorRegistry registry) {
         registry.addInterceptor(userStatusInterceptor)
-                .excludePathPatterns("/static/**", "/css/**", "/js/**", "/scripts/**", "/uploads/**", "/favicon.ico");
+                .excludePathPatterns("/static/**", "/css/**", "/js/**", "/scripts/**", "/uploads/**", "/favicon.ico", "/api/realtime/**");
     }
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
