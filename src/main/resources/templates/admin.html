@@ -105,94 +105,7 @@
             font-size: 0.9rem;
             margin-bottom: 6px;
         }
-        /* Excel-like Sheet Styling */
-        .excel-toolbar {
-            background-color: #1e1e30;
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-bottom: none;
-            padding: 8px 16px;
-            border-top-left-radius: 8px;
-            border-top-right-radius: 8px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        .excel-toolbar-btn {
-            background: transparent;
-            border: 1px solid rgba(255, 255, 255, 0.15);
-            color: #b2bec3;
-            padding: 4px 10px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            cursor: pointer;
-            transition: all 0.2s;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        .excel-toolbar-btn:hover {
-            background-color: rgba(255, 255, 255, 0.05);
-            color: white;
-            border-color: rgba(255, 255, 255, 0.25);
-        }
-        .excel-table-container {
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-bottom-left-radius: 8px;
-            border-bottom-right-radius: 8px;
-            overflow-x: auto;
-            max-height: 400px;
-        }
-        .excel-table {
-            border-collapse: collapse !important;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 0.85rem;
-            margin: 0;
-            width: 100%;
-        }
-        .excel-table th, .excel-table td {
-            border: 1px solid rgba(255, 255, 255, 0.12) !important;
-            padding: 6px 12px !important;
-            position: relative;
-            outline: none;
-            color: #b2bec3;
-            background-color: #12121e;
-        }
-        .excel-table th {
-            background-color: #1e1e30 !important;
-            color: white !important;
-            font-weight: 500;
-            text-align: left;
-            user-select: none;
-        }
-        .excel-index-col {
-            background-color: #1e1e30 !important;
-            color: #a29bfe !important;
-            font-weight: 600;
-            text-align: center;
-            user-select: none;
-            width: 40px;
-        }
-        .excel-table td.active-cell {
-            outline: 2px solid #2ecc71 !important;
-            outline-offset: -2px;
-            z-index: 10;
-            background-color: rgba(46, 204, 113, 0.05) !important;
-        }
-        .excel-table tr:hover td {
-            background-color: rgba(255, 255, 255, 0.02);
-        }
-        .excel-table th.excel-sortable {
-            cursor: pointer;
-        }
-        .excel-table th.excel-sortable:hover {
-            background-color: rgba(255, 255, 255, 0.05) !important;
-            color: #2ecc71 !important;
-        }
-        .excel-text-success {
-            color: #2ecc71 !important;
-            font-weight: bold;
-        }
+
         /* Premium Table Styles for approachable look */
         .table-premium tbody tr {
             transition: background-color 0.25s, transform 0.2s;
@@ -1603,73 +1516,7 @@
                         </div>
                     </div>
 
-                    <!-- User Economical Analysis (Excel-like Sheet, Admin Only or Owner) -->
-                    <div th:if="${userRole == 'ADMIN' or userRole == 'OWNER'}" class="card bg-dark border-0 p-4 rounded-3" style="border: 1px solid rgba(255, 255, 255, 0.05) !important;">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="h5 fw-bold text-white mb-0">
-                                <i class="fa-solid fa-file-excel text-success me-2"></i>User Economic Analysis (Excel Sheet)
-                            </h4>
-                            <div class="d-flex align-items-center gap-2">
-                                <div class="position-relative" style="width: 200px;">
-                                    <input type="text" id="user-analytics-search" class="form-input-admin" placeholder="Search..." style="padding: 4px 12px 4px 28px; font-size: 0.8rem;">
-                                    <i class="fa fa-search position-absolute text-muted" style="left: 8px; top: 8px; font-size: 0.8rem;"></i>
-                                </div>
-                                <select id="excel-role-filter" class="form-select-admin" style="padding: 4px 8px; font-size: 0.8rem;">
-                                    <option value="">All Roles</option>
-                                    <option value="READER">Reader</option>
-                                    <option value="EDITOR">Translator</option>
-                                    <option value="ADMIN">Admin</option>
-                                    <option value="PROOFREADER">Proof reader</option>
-                                </select>
-                            </div>
-                        </div>
 
-                        <!-- Excel Toolbar -->
-                        <div class="excel-toolbar">
-                            <button id="excel-btn-export" class="excel-toolbar-btn" type="button">
-                                <i class="fa-solid fa-file-export text-success"></i> Export CSV
-                            </button>
-                            <button id="excel-btn-sort-asc" class="excel-toolbar-btn" type="button">
-                                <i class="fa-solid fa-sort-amount-up"></i> Sort Balance Asc
-                            </button>
-                            <button id="excel-btn-sort-desc" class="excel-toolbar-btn" type="button">
-                                <i class="fa-solid fa-sort-amount-down"></i> Sort Balance Desc
-                            </button>
-                            <span class="text-muted small ms-auto" id="excel-sheet-info">Sheet1 | Active cells selectable</span>
-                        </div>
-
-                        <!-- Excel Table Grid -->
-                        <div class="excel-table-container">
-                            <table class="excel-table" id="table-user-analytics">
-                                <thead>
-                                    <!-- Alphabet Header Row like Excel -->
-                                    <tr style="text-align: center; background-color: #1e1e30; color: #8a8d93; font-size: 0.75rem;">
-                                        <th style="width: 40px; text-align: center; background-color: #2b2b3d; border: 1px solid rgba(255,255,255,0.08) !important;"></th>
-                                        <th style="border: 1px solid rgba(255,255,255,0.08) !important;">A</th>
-                                        <th style="border: 1px solid rgba(255,255,255,0.08) !important;">B</th>
-                                        <th style="border: 1px solid rgba(255,255,255,0.08) !important;">C</th>
-                                        <th style="border: 1px solid rgba(255,255,255,0.08) !important;">D</th>
-                                        <th style="border: 1px solid rgba(255,255,255,0.08) !important;">E</th>
-                                        <th style="border: 1px solid rgba(255,255,255,0.08) !important;">F</th>
-                                        <th style="border: 1px solid rgba(255,255,255,0.08) !important;">G</th>
-                                    </tr>
-                                    <tr>
-                                        <th style="width: 40px; text-align: center; background-color: #2b2b3d; border: 1px solid rgba(255,255,255,0.08) !important;"></th>
-                                        <th class="excel-sortable" data-col="id" style="border: 1px solid rgba(255,255,255,0.08) !important;">User ID <i class="fa-solid fa-sort-down ms-1"></i></th>
-                                        <th class="excel-sortable" data-col="name" style="border: 1px solid rgba(255,255,255,0.08) !important;">Name <i class="fa-solid fa-sort ms-1"></i></th>
-                                        <th class="excel-sortable" data-col="email" style="border: 1px solid rgba(255,255,255,0.08) !important;">Email <i class="fa-solid fa-sort ms-1"></i></th>
-                                        <th class="excel-sortable" data-col="role" style="border: 1px solid rgba(255,255,255,0.08) !important;">Role <i class="fa-solid fa-sort ms-1"></i></th>
-                                        <th class="excel-sortable" data-col="balance" style="border: 1px solid rgba(255,255,255,0.08) !important;">Balance <i class="fa-solid fa-sort ms-1"></i></th>
-                                        <th class="excel-sortable" data-col="totalSpent" style="border: 1px solid rgba(255,255,255,0.08) !important;">Total Spent <i class="fa-solid fa-sort ms-1"></i></th>
-                                        <th class="excel-sortable" data-col="chaptersUnlocked" style="border: 1px solid rgba(255,255,255,0.08) !important;">Unlocked <i class="fa-solid fa-sort ms-1"></i></th>
-                                    </tr>
-                                </thead>
-                                <tbody id="user-analytics-tbody">
-                                    <!-- Populated dynamically via AJAX -->
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
                 </div>
             </div>
         </div>
@@ -2486,14 +2333,7 @@
                         $(this).remove();
                     });
                 }
-                if (typeof userAnalyticsData !== 'undefined' && userAnalyticsData.length > 0) {
-                    userAnalyticsData = userAnalyticsData.filter(function(u) {
-                        return Number(u.userId) !== Number(deletedUserId);
-                    });
-                    if (typeof applyExcelFiltersAndSort === 'function') {
-                        applyExcelFiltersAndSort();
-                    }
-                }
+
             };
 
             window.handleUserRoleUpdatedRealtime = function(userId, role) {
@@ -2503,16 +2343,7 @@
                     select.data("original", role);
                     select.attr("data-original", role);
                 }
-                if (typeof userAnalyticsData !== 'undefined' && userAnalyticsData.length > 0) {
-                    userAnalyticsData.forEach(function(u) {
-                        if (Number(u.userId) === Number(userId)) {
-                            u.role = role;
-                        }
-                    });
-                    if (typeof applyExcelFiltersAndSort === 'function') {
-                        applyExcelFiltersAndSort();
-                    }
-                }
+
             };
 
             window.handleUserBalanceUpdatedRealtime = function(userId, balance) {
@@ -2529,16 +2360,7 @@
                         $("#navbar-user-balance").text(balance);
                     }
                 }
-                if (typeof userAnalyticsData !== 'undefined' && userAnalyticsData.length > 0) {
-                    userAnalyticsData.forEach(function(u) {
-                        if (Number(u.userId) === Number(userId)) {
-                            u.balance = balance;
-                        }
-                    });
-                    if (typeof applyExcelFiltersAndSort === 'function') {
-                        applyExcelFiltersAndSort();
-                    }
-                }
+
             };
 
             window.handleUserCreatedRealtime = function(user) {
@@ -2613,20 +2435,7 @@
                     newRow.fadeIn(300);
                 }
 
-                if (typeof userAnalyticsData !== 'undefined') {
-                    userAnalyticsData.push({
-                        userId: user.id,
-                        name: user.name,
-                        email: user.email,
-                        role: user.user_type,
-                        balance: user.balance,
-                        totalSpent: 0,
-                        chaptersUnlocked: 0
-                    });
-                    if (typeof applyExcelFiltersAndSort === 'function') {
-                        applyExcelFiltersAndSort();
-                    }
-                }
+
             };
 
             window.handleUserUpdatedRealtime = function(oldUserId, user) {
@@ -2697,20 +2506,7 @@
                     }
                 }
 
-                if (typeof userAnalyticsData !== 'undefined' && userAnalyticsData.length > 0) {
-                    userAnalyticsData.forEach(function(u) {
-                        if (Number(u.userId) === Number(oldUserId)) {
-                            u.userId = user.id;
-                            u.name = user.name;
-                            u.email = user.email;
-                            u.role = user.user_type;
-                            u.balance = user.balance;
-                        }
-                    });
-                    if (typeof applyExcelFiltersAndSort === 'function') {
-                        applyExcelFiltersAndSort();
-                    }
-                }
+
             };
 
             function escapeHtml(str) {
@@ -3702,11 +3498,7 @@
             let chartStorySalesInstance = null; // Used for editor or admin paginated chart
             let chartStoryPieInstance = null;
             let chartStoryFormatPolarInstance = null;
-            let userAnalyticsData = [];
-            
-            // Excel-like table state
-            let currentSortColumn = "id";
-            let currentSortDirection = "asc";
+
 
             // Histogram pagination state
             let histogramCurrentPage = 0;
@@ -3970,18 +3762,7 @@
                     showToast("Failed to retrieve analytics summary.", "error");
                 });
 
-                // Fetch user analytics (Admin Only)
-                const userAnalyticsTable = document.getElementById('table-user-analytics');
-                if (userAnalyticsTable) {
-                    $.get("/api/admin/analytics/users")
-                    .done(function(data) {
-                        userAnalyticsData = data;
-                        applyExcelFiltersAndSort();
-                    })
-                    .fail(function() {
-                        showToast("Failed to retrieve user analytics data.", "error");
-                    });
-                }
+
             };
 
             // Paginated Histogram Rendering
@@ -4081,172 +3862,7 @@
             });
 
 
-            // Excel-like Table Rendering & Sorting
-            function renderUserAnalyticsTable(users) {
-                const tbody = $("#user-analytics-tbody");
-                tbody.empty();
 
-                if (users.length === 0) {
-                    tbody.html('<tr><td colspan="8" class="text-center text-muted py-3">No matching user records found.</td></tr>');
-                    return;
-                }
-
-                users.forEach(function(u, idx) {
-                    let badgeClass = "bg-secondary";
-                    if (u.role === "ADMIN") badgeClass = "bg-danger";
-                    else if (u.role === "EDITOR") badgeClass = "bg-warning text-dark";
-                    else if (u.role === "PROOFREADER") badgeClass = "bg-info text-dark";
-                    else if (u.role === "DELETED") badgeClass = "bg-dark text-muted border border-secondary";
-
-                    const tr = $("<tr>");
-                    tr.append($("<td class='excel-index-col'>").text(idx + 1));
-                    tr.append($("<td>").text(u.userId));
-                    tr.append($("<td class='text-white fw-bold'>").text(u.name));
-                    tr.append($("<td>").text(u.email));
-                    let displayRole = u.role;
-                    if (displayRole === "EDITOR") displayRole = "TRANSLATOR";
-                    tr.append($("<td>").html(`<span class="badge ${badgeClass}">${displayRole}</span>`));
-                    tr.append($("<td class='text-white'>").text(u.balance));
-                    tr.append($("<td class='excel-text-success'>").text(u.totalSpent + " ❄️"));
-                    tr.append($("<td class='text-info'>").text(u.chaptersUnlocked));
-                    tbody.append(tr);
-                });
-
-                // Update sort indicator icons
-                $(".excel-sortable").each(function() {
-                    const col = $(this).data("col");
-                    const icon = $(this).find("i");
-                    icon.removeClass("fa-sort fa-sort-up fa-sort-down");
-                    if (col === currentSortColumn) {
-                        if (currentSortDirection === "asc") {
-                            icon.addClass("fa-sort-up text-success");
-                        } else {
-                            icon.addClass("fa-sort-down text-success");
-                        }
-                    } else {
-                        icon.addClass("fa-sort text-muted");
-                    }
-                });
-            }
-
-            // Click to activate excel cell highlight
-            $(document).on("click", ".excel-table td", function() {
-                $(".excel-table td").removeClass("active-cell");
-                if (!$(this).hasClass("excel-index-col")) {
-                    $(this).addClass("active-cell");
-                    const colIdx = $(this).index();
-                    const rowIdx = $(this).parent().find(".excel-index-col").text();
-                    const colLetter = String.fromCharCode(64 + colIdx); // index 1 corresponds to A
-                    $("#excel-sheet-info").html(`Cell: <strong class="text-success">${colLetter}${rowIdx}</strong> | Value: "<code>${$(this).text().trim()}</code>"`);
-                }
-            });
-
-            // Filtering and sorting application
-            function applyExcelFiltersAndSort() {
-                let filtered = [...userAnalyticsData];
-                
-                // Apply search
-                const searchVal = $("#user-analytics-search").val().toLowerCase().trim();
-                if (searchVal !== "") {
-                    filtered = filtered.filter(u => 
-                        (u.name && u.name.toLowerCase().includes(searchVal)) ||
-                        (u.email && u.email.toLowerCase().includes(searchVal)) ||
-                        (u.role && u.role.toLowerCase().includes(searchVal)) ||
-                        (u.userId && u.userId.toString().includes(searchVal))
-                    );
-                }
-
-                // Apply role filter
-                const roleVal = $("#excel-role-filter").val();
-                if (roleVal !== "") {
-                    filtered = filtered.filter(u => u.role === roleVal);
-                }
-
-                // Apply sorting
-                filtered.sort((a, b) => {
-                    let valA = a[currentSortColumn];
-                    let valB = b[currentSortColumn];
-
-                    if (typeof valA === 'string') {
-                        valA = valA.toLowerCase();
-                        valB = valB.toLowerCase();
-                    }
-
-                    if (valA < valB) return currentSortDirection === 'asc' ? -1 : 1;
-                    if (valA > valB) return currentSortDirection === 'asc' ? 1 : -1;
-                    return 0;
-                });
-
-                renderUserAnalyticsTable(filtered);
-            }
-
-            // Sorting click handler
-            $(document).on("click", ".excel-sortable", function() {
-                const col = $(this).data("col");
-                if (currentSortColumn === col) {
-                    currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
-                } else {
-                    currentSortColumn = col;
-                    currentSortDirection = 'asc';
-                }
-                applyExcelFiltersAndSort();
-            });
-
-            // Search filter trigger
-            $(document).on("input", "#user-analytics-search", function() {
-                applyExcelFiltersAndSort();
-            });
-
-            // Role filter trigger
-            $(document).on("change", "#excel-role-filter", function() {
-                applyExcelFiltersAndSort();
-            });
-
-            // Toolbar quick sort buttons
-            $(document).on("click", "#excel-btn-sort-asc", function() {
-                currentSortColumn = "balance";
-                currentSortDirection = "asc";
-                applyExcelFiltersAndSort();
-            });
-
-            $(document).on("click", "#excel-btn-sort-desc", function() {
-                currentSortColumn = "balance";
-                currentSortDirection = "desc";
-                applyExcelFiltersAndSort();
-            });
-
-            // Export to CSV helper
-            $(document).on("click", "#excel-btn-export", function() {
-                if (userAnalyticsData.length === 0) {
-                    showToast("No data to export.", "error");
-                    return;
-                }
-
-                let csvContent = "data:text/csv;charset=utf-8,";
-                csvContent += "User ID,Name,Email,Role,Balance,Total Spent,Chapters Unlocked\r\n";
-
-                userAnalyticsData.forEach(function(u) {
-                    const row = [
-                        u.userId,
-                        `"${u.name.replace(/"/g, '""')}"`,
-                        u.email,
-                        u.role,
-                        u.balance,
-                        u.totalSpent,
-                        u.chaptersUnlocked
-                    ].join(",");
-                    csvContent += row + "\r\n";
-                });
-
-                const encodedUri = encodeURI(csvContent);
-                const link = document.createElement("a");
-                link.setAttribute("href", encodedUri);
-                link.setAttribute("download", "user_economic_analysis.csv");
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
-                showToast("CSV file exported successfully!");
-            });
 
             // --- SNOW FLAKES PACKAGES EVENT HANDLERS ---
 
