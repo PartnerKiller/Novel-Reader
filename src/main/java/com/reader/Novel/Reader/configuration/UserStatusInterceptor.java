@@ -64,6 +64,26 @@ public class UserStatusInterceptor implements HandlerInterceptor {
         
         if (sessionUser != null && sessionUser.getId() != null) {
             User dbUser = userService.getUserById(sessionUser.getId());
+            if (dbUser == null || dbUser.getId() == null) {
+                session.invalidate();
+                jakarta.servlet.http.Cookie rmCookie = new jakarta.servlet.http.Cookie("remember_me", "");
+                rmCookie.setMaxAge(0);
+                rmCookie.setPath("/");
+                response.addCookie(rmCookie);
+                
+                String uri = request.getRequestURI();
+                if (uri.startsWith("/api/")) {
+                    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                    response.setContentType("application/json");
+                    PrintWriter writer = response.getWriter();
+                    writer.write("{\"error\":\"User session expired or user deleted.\"}");
+                    writer.flush();
+                    return false;
+                } else {
+                    response.sendRedirect("/?error=" + URLEncoder.encode("Your session has expired.", StandardCharsets.UTF_8));
+                    return false;
+                }
+            }
             if (dbUser != null && dbUser.getId() != null) {
                 boolean isBanned = Boolean.TRUE.equals(dbUser.getBanned());
                 boolean isTimedOut = dbUser.getTimeoutUntil() != null && dbUser.getTimeoutUntil().isAfter(LocalDateTime.now());
