@@ -30,7 +30,6 @@ public class AdminController {
             return "redirect:/"; // Unauthorized, kick out to homepage
         }
 
-        // If secured mode is active and user is NOT owner, filter out all data!
         boolean isOwner = "OWNER".equals(role);
 
         // Admin-only data (or owner)
