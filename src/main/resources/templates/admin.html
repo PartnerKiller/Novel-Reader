@@ -523,13 +523,54 @@
                     </button>
                     
                     <!-- Disguised/Hidden toggle system button (OWNER only) -->
-                    <div th:if="${userRole == 'OWNER'}" style="margin-top: auto; padding-top: 25px; text-align: center;">
-                        <button type="button" id="btn-self-destruct" 
-                                class="btn-self-destruct" 
-                                style="background: none; border: none; padding: 0; color: rgba(255, 255, 255, 0.12); font-size: 0.72rem; cursor: pointer; user-select: none; transition: opacity 0.3s; width: 100%;">
-                            <span class="btn-self-destruct-bg" style="display:none;"></span>
-                            <span id="self-destruct-text"><i class="fa-solid fa-circle-nodes me-1" style="font-size: 0.65rem;"></i>v1.0.9-secure</span>
-                        </button>
+                    <div th:if="${userRole == 'OWNER'}" class="mt-4 pt-3 border-top border-secondary">
+                        <!-- Disguised Button (looks like Image 1) -->
+                        <div id="disguised-version-trigger" 
+                             style="border: 1px solid rgba(231, 76, 60, 0.25); background: rgba(0, 0, 0, 0.15); border-radius: 4px; padding: 8px 12px; color: #4a4a5a; font-size: 0.8rem; cursor: pointer; user-select: none; transition: all 0.3s; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 500;">
+                            <i class="fa-solid fa-share-nodes" style="color: #4a4a5a; font-size: 0.85rem;"></i>
+                            <span>v1.0.9-secure</span>
+                        </div>
+
+                        <!-- Collapsible Security Control Panel (looks like Image 2, hidden by default) -->
+                        <div id="hidden-security-panel" style="display: none; margin-top: 15px;">
+                            <!-- If normal mode: show trigger self-destruct -->
+                            <div th:if="${!securedMode}">
+                                <label class="form-label-admin d-block text-danger mb-2" style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+                                    <i class="fa-solid fa-triangle-exclamation me-1"></i> SYSTEM SECURITY
+                                </label>
+                                <button type="button" 
+                                        class="w-100 btn-self-destruct position-relative overflow-hidden" 
+                                        style="background-color: rgba(231, 76, 60, 0.1); border: 1px solid rgba(231, 76, 60, 0.4); border-radius: 8px; color: #e74c3c; font-weight: 700; font-size: 0.85rem; padding: 12px; transition: all 0.3s; cursor: pointer; user-select: none;">
+                                    <span class="btn-self-destruct-bg position-absolute top-0 start-0 h-100 bg-danger" style="width: 0%; opacity: 0.25; transition: width 0.1s linear;"></span>
+                                    <span class="position-relative z-index-2 d-flex align-items-center justify-content-center gap-2">
+                                        <i class="fa-solid fa-radiation"></i>
+                                        <span>TRIGGER SELF-DESTRUCT</span>
+                                    </span>
+                                </button>
+                                <small class="text-muted d-block mt-2 text-center" style="font-size: 0.72rem; line-height: 1.2;">
+                                    Press and hold for 3 seconds to hide all content from public view.
+                                </small>
+                            </div>
+
+                            <!-- If secured mode: show recovery -->
+                            <div th:if="${securedMode}">
+                                <label class="form-label-admin d-block text-success mb-2" style="font-size: 0.8rem; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
+                                    <i class="fa-solid fa-shield-heart me-1"></i> SYSTEM RECOVERY
+                                </label>
+                                <button type="button" 
+                                        class="w-100 btn-self-destruct active position-relative overflow-hidden" 
+                                        style="background-color: rgba(46, 204, 113, 0.1); border: 1px solid rgba(46, 204, 113, 0.4); border-radius: 8px; color: #2ecc71; font-weight: 700; font-size: 0.85rem; padding: 12px; transition: all 0.3s; cursor: pointer; user-select: none;">
+                                    <span class="btn-self-destruct-bg position-absolute top-0 start-0 h-100 bg-success" style="width: 0%; opacity: 0.25; transition: width 0.1s linear;"></span>
+                                    <span class="position-relative z-index-2 d-flex align-items-center justify-content-center gap-2">
+                                        <i class="fa-solid fa-shield-heart"></i>
+                                        <span>RESTORE & RECOVER SITE</span>
+                                    </span>
+                                </button>
+                                <small class="text-muted d-block mt-2 text-center" style="font-size: 0.72rem; line-height: 1.2;">
+                                    Press and hold for 3 seconds to restore the site and make it public.
+                                </small>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4318,27 +4359,33 @@
                 }
             });
 
-            // OWNER HIDDEN SELF-DESTRUCT BUTTON LOGIC
+            // OWNER HIDDEN SELF-DESTRUCT PANEL & HOLD LOGIC
             if (currentRole === 'OWNER') {
+                // Clicking the version tag toggles/slides the hidden security panel
+                $("#disguised-version-trigger").on("click", function() {
+                    $("#hidden-security-panel").slideToggle(200);
+                });
+
                 let holdTimer = null;
                 const holdDuration = 3000; // 3 seconds
                 let startHoldTime = 0;
                 let isHolding = false;
-                const selfDestructBtn = $("#btn-self-destruct");
-                const textSpan = $("#self-destruct-text");
+                
+                // Selectors for hold progress
+                const destructBtn = $(".btn-self-destruct");
+                const progressBg = $(".btn-self-destruct-bg");
 
                 function startHold(e) {
                     if (isHolding) return;
                     e.preventDefault();
                     isHolding = true;
                     startHoldTime = Date.now();
-                    selfDestructBtn.css("color", "#e74c3c"); // Change color to alert red while holding
-                    selfDestructBtn.css("opacity", "1");
+                    progressBg.css("width", "0%");
                     
                     holdTimer = setInterval(function() {
                         const elapsed = Date.now() - startHoldTime;
                         const progress = Math.min((elapsed / holdDuration) * 100, 100);
-                        textSpan.text("Holding... " + Math.floor(progress) + "%");
+                        progressBg.css("width", progress + "%");
 
                         if (elapsed >= holdDuration) {
                             clearInterval(holdTimer);
@@ -4355,13 +4402,11 @@
                         clearInterval(holdTimer);
                         holdTimer = null;
                     }
-                    selfDestructBtn.css("color", "rgba(255, 255, 255, 0.12)");
-                    selfDestructBtn.css("opacity", "1");
-                    textSpan.html("<i class='fa-solid fa-circle-nodes me-1' style='font-size: 0.65rem;'></i>v1.0.9-secure");
+                    progressBg.css("width", "0%");
                 }
 
                 function triggerSelfDestruct() {
-                    // Send request to toggle self-destruct mode via disguised endpoint
+                    progressBg.css("width", "100%");
                     $.post("/api/admin/system-state")
                     .done(function(res) {
                         const active = res.securedMode;
@@ -4375,13 +4420,13 @@
                         }, 1200);
                     })
                     .fail(function(err) {
-                        const msg = err.responseJSON && err.responseJSON.error ? err.responseJSON.error : "Failed to toggle State.";
+                        const msg = err.responseJSON && err.responseJSON.error ? err.responseJSON.error : "Failed to update state.";
                         showToast(msg, "error");
-                        endHold();
+                        progressBg.css("width", "0%");
                     });
                 }
 
-                selfDestructBtn.on("mousedown touchstart", startHold);
+                destructBtn.on("mousedown touchstart", startHold);
                 $(window).on("mouseup touchend mouseleave touchcancel", endHold);
             }
 
