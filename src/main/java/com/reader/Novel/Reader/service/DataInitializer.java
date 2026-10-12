@@ -250,5 +250,42 @@ public class DataInitializer implements CommandLineRunner {
                 novelRepository.save(n);
             }
         }
+
+        if (novelRepository.count() == 0) {
+            try {
+                org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("seed_data.sql");
+                if (resource.exists()) {
+                    org.springframework.jdbc.datasource.init.ResourceDatabasePopulator populator = 
+                        new org.springframework.jdbc.datasource.init.ResourceDatabasePopulator(resource);
+                    populator.execute(jdbcTemplate.getDataSource());
+                    System.out.println("Default catalog content successfully seeded from seed_data.sql.");
+                }
+            } catch (Exception e) {
+                System.err.println("Error seeding default catalog from seed_data.sql: " + e.getMessage());
+            }
+        }
+
+        try {
+            String userDir = System.getProperty("user.dir");
+            File uploadsDir = new File(userDir, "uploads");
+            if (!uploadsDir.exists()) {
+                uploadsDir.mkdirs();
+            }
+            org.springframework.core.io.support.PathMatchingResourcePatternResolver resolver = 
+                new org.springframework.core.io.support.PathMatchingResourcePatternResolver();
+            org.springframework.core.io.Resource[] coverResources = resolver.getResources("classpath:/static/covers/*");
+            for (org.springframework.core.io.Resource r : coverResources) {
+                String filename = r.getFilename();
+                if (filename != null) {
+                    File target = new File(uploadsDir, filename);
+                    if (!target.exists()) {
+                        java.nio.file.Files.copy(r.getInputStream(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("Error synchronizing static covers to uploads directory: " + e.getMessage());
+        }
+
     }
 }
