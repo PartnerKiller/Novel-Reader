@@ -251,7 +251,7 @@ public class DataInitializer implements CommandLineRunner {
             }
         }
 
-        if (novelRepository.count() == 0) {
+        if (novelRepository.count() < 24) {
             try {
                 org.springframework.core.io.ClassPathResource resource = new org.springframework.core.io.ClassPathResource("seed_data.sql");
                 if (resource.exists()) {
