@@ -520,6 +520,7 @@
                                 <option value="manage-existing">Manage Stories</option>
                                 <option value="create-story">Create New Story Series</option>
                                 <option value="add-chapter">Add New Chapter</option>
+                                <option value="batch-import">🚀 Batch Import Novels / Chapters</option>
                             </select>
                         </div>
                     </div>
@@ -670,6 +671,156 @@
                             </div>
                         </form>
                     </div>
+
+                    
+                    <!-- Batch Import Section -->
+                    <div id="section-batch-import" class="card bg-dark border-0 p-4 mb-5 rounded-3 d-none" style="border: 1px solid rgba(255,255,255,0.03) !important;">
+                        <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap gap-2">
+                            <div>
+                                <h3 class="h5 fw-bold text-white mb-1"><i class="fa-solid fa-file-import text-violet me-2"></i>Batch Import Novels & Chapters</h3>
+                                <p class="text-muted small mb-0">Import complete novels from EPUB, single/multi-chapter TXT files, or ZIP archives containing formatted chapter texts. The system parses metadata, extracts chapters, and sets up your reader instantly.</p>
+                            </div>
+                        </div>
+
+                        <!-- Import Tabs / Mode -->
+                        <ul class="nav nav-pills mb-4" id="import-pills-tab" role="tablist">
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link active rounded-pill px-4 me-2" id="pill-import-file-tab" data-bs-toggle="pill" data-bs-target="#pill-import-file" type="button" role="tab"><i class="fa-solid fa-cloud-arrow-up me-2"></i>Upload File (.epub / .txt / .zip)</button>
+                            </li>
+                            <li class="nav-item" role="presentation">
+                                <button class="nav-link rounded-pill px-4" id="pill-import-server-tab" data-bs-toggle="pill" data-bs-target="#pill-import-server" type="button" role="tab"><i class="fa-solid fa-server me-2"></i>Server Directory (import/)</button>
+                            </li>
+                        </ul>
+
+                        <div class="tab-content" id="import-pills-tabContent">
+                            <!-- Tab 1: Upload File -->
+                            <div class="tab-pane fade show active" id="pill-import-file" role="tabpanel">
+                                <form id="form-batch-import" enctype="multipart/form-data">
+                                    <div class="row g-3">
+                                        <!-- Import Target Option -->
+                                        <div class="col-12">
+                                            <label class="form-label-admin">Import Destination</label>
+                                            <div class="d-flex gap-4 mt-1">
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="importTargetMode" id="import-mode-new" value="new" checked>
+                                                    <label class="form-check-label text-white" for="import-mode-new">
+                                                        Create as <strong>New Novel Series</strong> (auto-detects title, author & chapters)
+                                                    </label>
+                                                </div>
+                                                <div class="form-check">
+                                                    <input class="form-check-input" type="radio" name="importTargetMode" id="import-mode-append" value="append">
+                                                    <label class="form-check-label text-white" for="import-mode-append">
+                                                        Append Chapters into <strong>Existing Series</strong>
+                                                    </label>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Target Novel Dropdown (visible when appending) -->
+                                        <div class="col-md-6 d-none" id="group-target-novel-select">
+                                            <label class="form-label-admin">Select Existing Story</label>
+                                            <select class="form-input-admin" id="batch-import-target-novel" name="targetNovelId">
+                                                <option th:each="novel : ${novels}" th:value="${novel.id}" th:text="${novel.title} + ' [' + ${novel.type} + ']'"></option>
+                                            </select>
+                                        </div>
+
+                                        <!-- File Upload input -->
+                                        <div class="col-md-6" id="group-file-upload">
+                                            <label class="form-label-admin">Choose File (.epub, .txt, .zip)</label>
+                                            <input type="file" class="form-input-admin" id="batch-import-file" name="file" accept=".epub,.txt,.zip" required style="padding: 7px 14px;">
+                                            <small class="text-muted d-block mt-1">EPUB (auto-extracts cover & spine), TXT (splits on Chapter headings), ZIP (multiple txt/html files)</small>
+                                        </div>
+
+                                        <div class="col-md-6" id="group-import-title">
+                                            <label class="form-label-admin">Novel Title <span class="text-muted">(Optional override)</span></label>
+                                            <input type="text" class="form-input-admin" id="batch-import-title" name="title" placeholder="Leave blank to use filename or EPUB metadata">
+                                        </div>
+
+                                        <div class="col-md-6" id="group-import-author">
+                                            <label class="form-label-admin">Author <span class="text-muted">(Optional override)</span></label>
+                                            <input type="text" class="form-input-admin" id="batch-import-author" name="author" placeholder="Leave blank to use EPUB metadata or Unknown">
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <label class="form-label-admin">Chapter Splitting Pattern</label>
+                                            <select class="form-input-admin" id="batch-import-split" name="splitPattern">
+                                                <option value="auto">Auto-detect (Chapter 1, Ch. 1, Episode 1, etc.)</option>
+                                                <option value="chapter_num">Strict: "Chapter [0-9]+" or "Ch. [0-9]+"</option>
+                                                <option value="volume_chap">Volumes & Chapters ("Volume 1 Chapter 1")</option>
+                                                <option value="one_chapter">Single Chapter (Entire file as 1 chapter)</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <label class="form-label-admin">Default Price per Chapter (Snow Flakes)</label>
+                                            <input type="number" class="form-input-admin" id="batch-import-price" name="pricePerChapter" min="0" value="0" placeholder="0 for free">
+                                        </div>
+
+                                        <div class="col-md-4">
+                                            <label class="form-label-admin">Type</label>
+                                            <select class="form-input-admin" id="batch-import-type" name="type">
+                                                <option value="NOVEL">NOVEL</option>
+                                                <option value="COMIC">COMIC</option>
+                                            </select>
+                                        </div>
+
+                                        <div class="col-12" id="group-import-desc">
+                                            <label class="form-label-admin">Synopsis / Description <span class="text-muted">(Optional)</span></label>
+                                            <textarea class="form-input-admin" id="batch-import-desc" name="description" rows="2" placeholder="Leave blank to auto-extract from EPUB..."></textarea>
+                                        </div>
+
+                                        <!-- Progress Bar -->
+                                        <div class="col-12 d-none" id="batch-import-progress-container">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span class="text-muted small" id="batch-import-progress-status">Uploading & analyzing file...</span>
+                                                <span class="text-muted small" id="batch-import-progress-pct">0%</span>
+                                            </div>
+                                            <div class="progress" style="height: 8px; background-color: #12121e;">
+                                                <div id="batch-import-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-violet" role="progressbar" style="width: 0%;"></div>
+                                            </div>
+                                        </div>
+
+                                        <!-- Alert / Results Container -->
+                                        <div class="col-12 d-none" id="batch-import-result"></div>
+
+                                        <div class="col-12 text-end">
+                                            <button type="submit" class="btn btn-premium px-4 py-2" id="btn-submit-batch-import">
+                                                <i class="fa-solid fa-cloud-arrow-up me-2"></i>Start Batch Import
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+
+                            <!-- Tab 2: Server Directory -->
+                            <div class="tab-pane fade" id="pill-import-server" role="tabpanel">
+                                <div class="bg-black bg-opacity-25 p-4 rounded-3 border border-secondary border-opacity-25">
+                                    <div class="d-flex align-items-center mb-3">
+                                        <i class="fa-solid fa-folder-tree text-violet fa-2x me-3"></i>
+                                        <div>
+                                            <h4 class="h6 fw-bold text-white mb-1">Direct Server Bulk Ingestion</h4>
+                                            <p class="text-muted small mb-0">Place any <code>.txt</code> or <code>.epub</code> files directly into the server's <code>import/</code> folder. The importer will parse each file, create the novel and chapters, extract covers, and archive finished files into <code>import/imported/</code>.</p>
+                                        </div>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        <label class="form-label-admin">Server Folder Path (Relative or Absolute)</label>
+                                        <input type="text" class="form-input-admin" id="server-dir-path" value="import" placeholder="e.g. import or /media/storage/projects/test-cloudflare/yuki-tales/import">
+                                    </div>
+
+                                    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+                                        <span class="text-muted small"><i class="fa-solid fa-circle-info text-info me-1"></i>Large novel files or hundreds of chapters can be imported in seconds without browser upload timeouts.</span>
+                                        <button type="button" class="btn btn-primary px-4 py-2" id="btn-run-server-dir-import">
+                                            <i class="fa-solid fa-play me-2"></i>Scan & Import Server Directory
+                                        </button>
+                                    </div>
+
+                                    <div class="mt-3 d-none" id="server-dir-import-result"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
 
                     <!-- Existing Content Management Section -->
                     <div id="section-manage-existing" class="card bg-dark border-0 p-4 mt-5 rounded-3" style="border: 1px solid rgba(255,255,255,0.03) !important;">
@@ -2314,6 +2465,7 @@
                 $("#section-create-story").addClass("d-none");
                 $("#section-add-chapter").addClass("d-none");
                 $("#section-manage-existing").addClass("d-none");
+                $("#section-batch-import").addClass("d-none");
                 
                 // Show the selected one
                 if (selected === "create-story") {
@@ -4626,6 +4778,142 @@
                     showToast(msg, "error");
                 });
             });
+
+            
+            // --- BATCH IMPORT LOGIC ---
+            $('input[name="importTargetMode"]').change(function() {
+                if ($(this).val() === 'append') {
+                    $('#group-target-novel-select').removeClass('d-none');
+                    $('#group-import-title').addClass('d-none');
+                    $('#group-import-author').addClass('d-none');
+                    $('#group-import-desc').addClass('d-none');
+                } else {
+                    $('#group-target-novel-select').addClass('d-none');
+                    $('#group-import-title').removeClass('d-none');
+                    $('#group-import-author').removeClass('d-none');
+                    $('#group-import-desc').removeClass('d-none');
+                }
+            });
+
+            $("#form-batch-import").submit(function(e) {
+                e.preventDefault();
+                var fileInput = $("#batch-import-file")[0];
+                if (!fileInput.files || fileInput.files.length === 0) {
+                    showToast("Please select a file to import (.epub, .txt, or .zip).", "error");
+                    return;
+                }
+                
+                var formData = new FormData();
+                formData.append("file", fileInput.files[0]);
+                
+                var isAppend = $('input[name="importTargetMode"]:checked').val() === 'append';
+                if (isAppend) {
+                    formData.append("targetNovelId", $("#batch-import-target-novel").val());
+                } else {
+                    var t = $("#batch-import-title").val().trim();
+                    var a = $("#batch-import-author").val().trim();
+                    var d = $("#batch-import-desc").val().trim();
+                    if (t) formData.append("title", t);
+                    if (a) formData.append("author", a);
+                    if (d) formData.append("description", d);
+                }
+                
+                formData.append("splitPattern", $("#batch-import-split").val());
+                formData.append("pricePerChapter", $("#batch-import-price").val());
+                formData.append("type", $("#batch-import-type").val());
+
+                var btn = $("#btn-submit-batch-import");
+                btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin me-2"></i>Processing & Importing...');
+                $("#batch-import-progress-container").removeClass("d-none");
+                $("#batch-import-progress-bar").css("width", "40%").removeClass("bg-success bg-danger").addClass("bg-violet");
+                $("#batch-import-progress-pct").text("40%");
+                $("#batch-import-progress-status").text("Uploading and parsing chapters...");
+                $("#batch-import-result").addClass("d-none").empty();
+
+                $.ajax({
+                    url: "/api/admin/stories/batch-import",
+                    type: "POST",
+                    data: formData,
+                    processData: false,
+                    contentType: false,
+                    xhr: function() {
+                        var xhr = new window.XMLHttpRequest();
+                        xhr.upload.addEventListener("progress", function(evt) {
+                            if (evt.lengthComputable) {
+                                var percentComplete = Math.round((evt.loaded / evt.total) * 70);
+                                $("#batch-import-progress-bar").css("width", percentComplete + "%");
+                                $("#batch-import-progress-pct").text(percentComplete + "%");
+                            }
+                        }, false);
+                        return xhr;
+                    },
+                    success: function(res) {
+                        $("#batch-import-progress-bar").css("width", "100%").removeClass("bg-violet bg-danger").addClass("bg-success");
+                        $("#batch-import-progress-pct").text("100%");
+                        $("#batch-import-progress-status").text("Import finished!");
+                        btn.prop("disabled", false).html('<i class="fa-solid fa-cloud-arrow-up me-2"></i>Start Batch Import');
+                        
+                        var html = '<div class="alert alert-success border-0 bg-success bg-opacity-25 text-white p-3 rounded-3 mt-3">' +
+                            '<h5 class="alert-heading fw-bold mb-2"><i class="fa-solid fa-check-circle text-success me-2"></i>Import Successful!</h5>' +
+                            '<p class="mb-1"><strong>Novel:</strong> ' + (res.novelTitle || res.novelId) + '</p>' +
+                            '<p class="mb-1"><strong>Chapters Imported:</strong> ' + res.chaptersCount + '</p>' +
+                            '<p class="mb-2 text-muted small">' + res.message + '</p>' +
+                            '<a href="/novels/' + res.novelId + '" target="_blank" class="btn btn-sm btn-light fw-bold"><i class="fa-solid fa-book-open me-1"></i>View Novel in Reader</a>' +
+                            '</div>';
+                        $("#batch-import-result").html(html).removeClass("d-none");
+                        showToast("Successfully imported " + res.chaptersCount + " chapters!");
+                        fileInput.value = "";
+                    },
+                    error: function(err) {
+                        $("#batch-import-progress-bar").css("width", "100%").removeClass("bg-violet bg-success").addClass("bg-danger");
+                        $("#batch-import-progress-status").text("Import failed.");
+                        btn.prop("disabled", false).html('<i class="fa-solid fa-cloud-arrow-up me-2"></i>Start Batch Import');
+                        var errMsg = "Failed to import file.";
+                        if (err.responseJSON && err.responseJSON.error) {
+                            errMsg = err.responseJSON.error;
+                        }
+                        var html = '<div class="alert alert-danger border-0 bg-danger bg-opacity-25 text-white p-3 rounded-3 mt-3">' +
+                            '<i class="fa-solid fa-triangle-exclamation me-2"></i>' + errMsg +
+                            '</div>';
+                        $("#batch-import-result").html(html).removeClass("d-none");
+                        showToast(errMsg, "error");
+                    }
+                });
+            });
+
+            $("#btn-run-server-dir-import").click(function() {
+                var dir = $("#server-dir-path").val().trim() || "import";
+                var btn = $(this);
+                btn.prop("disabled", true).html('<i class="fa fa-spinner fa-spin me-2"></i>Scanning & Importing...');
+                $("#server-dir-import-result").addClass("d-none").empty();
+
+                $.ajax({
+                    url: "/api/admin/stories/import-server-dir?directoryPath=" + encodeURIComponent(dir),
+                    type: "POST",
+                    success: function(res) {
+                        btn.prop("disabled", false).html('<i class="fa-solid fa-play me-2"></i>Scan & Import Server Directory');
+                        var novelsCount = (res.importedNovels && res.importedNovels.length) || 0;
+                        var html = '<div class="alert alert-success border-0 bg-success bg-opacity-25 text-white p-3 rounded-3">' +
+                            '<h5 class="alert-heading fw-bold mb-2"><i class="fa-solid fa-check-circle text-success me-2"></i>Server Ingestion Finished</h5>' +
+                            '<p class="mb-1"><strong>Novels Processed:</strong> ' + novelsCount + '</p>' +
+                            '<p class="mb-1"><strong>Total Chapters Imported:</strong> ' + res.totalChaptersImported + '</p>' +
+                            '<p class="mb-0 text-muted small">' + res.message + '</p>' +
+                            '</div>';
+                        $("#server-dir-import-result").html(html).removeClass("d-none");
+                        showToast("Server directory import completed (" + res.totalChaptersImported + " chapters)!");
+                    },
+                    error: function(err) {
+                        btn.prop("disabled", false).html('<i class="fa-solid fa-play me-2"></i>Scan & Import Server Directory');
+                        var errMsg = (err.responseJSON && err.responseJSON.error) || "Error importing from server directory.";
+                        var html = '<div class="alert alert-danger border-0 bg-danger bg-opacity-25 text-white p-3 rounded-3">' +
+                            '<i class="fa-solid fa-triangle-exclamation me-2"></i>' + errMsg +
+                            '</div>';
+                        $("#server-dir-import-result").html(html).removeClass("d-none");
+                        showToast(errMsg, "error");
+                    }
+                });
+            });
+
 
             // Restore last active tab if present
             const activeTab = localStorage.getItem('adminActiveTab') || 'stories';

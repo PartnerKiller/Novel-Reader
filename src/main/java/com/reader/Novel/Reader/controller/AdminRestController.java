@@ -2391,4 +2391,569 @@ public class AdminRestController {
         couponRepository.deleteById(couponId);
         return ResponseEntity.ok(Map.of("success", true, "message", "Coupon deleted successfully."));
     }
+
+
+    // -------------------------------------------------------------
+    // 7. BATCH IMPORT STORIES & CHAPTERS (EPUB, TXT, ZIP & SERVER DIR)
+    // -------------------------------------------------------------
+
+    @PostMapping(value = "/stories/batch-import", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> batchImportStory(
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(required = false) Long targetNovelId,
+            @RequestParam(required = false) String title,
+            @RequestParam(required = false) String author,
+            @RequestParam(required = false) String description,
+            @RequestParam(required = false) String coverUrl,
+            @RequestParam(defaultValue = "NOVEL") String type,
+            @RequestParam(defaultValue = "Fantasy, Adventure") String genre,
+            @RequestParam(defaultValue = "0") Integer pricePerChapter,
+            @RequestParam(defaultValue = "auto") String splitPattern,
+            HttpSession session) {
+
+        if (isRestricted(session)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Platform is in secured mode."));
+        }
+        User loggedInUser = (User) session.getAttribute("user");
+        if (loggedInUser == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Not logged in."));
+        }
+        String role = loggedInUser.getUser_type();
+        if (!"ADMIN".equals(role) && !"EDITOR".equals(role) && !"PROOFREADER".equals(role) && !"OWNER".equals(role)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Unauthorized access."));
+        }
+
+        if (file == null || file.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Please provide a valid file to import."));
+        }
+
+        String originalFilename = file.getOriginalFilename() != null ? file.getOriginalFilename() : "imported_file.txt";
+        String lowerName = originalFilename.toLowerCase();
+
+        try {
+            Novel targetNovel = null;
+            if (targetNovelId != null && targetNovelId > 0) {
+                targetNovel = novelService.getNovelById(targetNovelId);
+                if (targetNovel == null) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", "Target novel not found."));
+                }
+            }
+
+            List<Map<String, Object>> parsedChapters = new java.util.ArrayList<>();
+            String extractedTitle = title;
+            String extractedAuthor = author;
+            String extractedDescription = description;
+            String extractedCoverUrl = coverUrl;
+
+            if (lowerName.endsWith(".epub")) {
+                Map<String, Object> epubResult = parseEpubArchive(file.getInputStream());
+                if (extractedTitle == null || extractedTitle.trim().isEmpty()) {
+                    extractedTitle = (String) epubResult.get("title");
+                }
+                if (extractedAuthor == null || extractedAuthor.trim().isEmpty()) {
+                    extractedAuthor = (String) epubResult.get("author");
+                }
+                if (extractedDescription == null || extractedDescription.trim().isEmpty()) {
+                    extractedDescription = (String) epubResult.get("description");
+                }
+                if (extractedCoverUrl == null || extractedCoverUrl.trim().isEmpty()) {
+                    extractedCoverUrl = (String) epubResult.get("coverUrl");
+                }
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> chaps = (List<Map<String, Object>>) epubResult.get("chapters");
+                if (chaps != null) {
+                    parsedChapters.addAll(chaps);
+                }
+            } else if (lowerName.endsWith(".zip")) {
+                Map<String, Object> zipResult = parseZipArchive(file.getInputStream(), originalFilename);
+                if (extractedTitle == null || extractedTitle.trim().isEmpty()) {
+                    extractedTitle = (String) zipResult.get("title");
+                }
+                if (extractedAuthor == null || extractedAuthor.trim().isEmpty()) {
+                    extractedAuthor = (String) zipResult.get("author");
+                }
+                if (extractedCoverUrl == null || extractedCoverUrl.trim().isEmpty()) {
+                    extractedCoverUrl = (String) zipResult.get("coverUrl");
+                }
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> chaps = (List<Map<String, Object>>) zipResult.get("chapters");
+                if (chaps != null) {
+                    parsedChapters.addAll(chaps);
+                }
+            } else {
+                String text = new String(file.getBytes(), java.nio.charset.StandardCharsets.UTF_8);
+                Map<String, Object> txtResult = parseTextChapters(text, originalFilename, splitPattern);
+                if (extractedTitle == null || extractedTitle.trim().isEmpty()) {
+                    extractedTitle = (String) txtResult.get("title");
+                }
+                if (extractedAuthor == null || extractedAuthor.trim().isEmpty()) {
+                    extractedAuthor = (String) txtResult.get("author");
+                }
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> chaps = (List<Map<String, Object>>) txtResult.get("chapters");
+                if (chaps != null) {
+                    parsedChapters.addAll(chaps);
+                }
+            }
+
+            if (parsedChapters.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "No readable chapters could be found or parsed from the file."));
+            }
+
+            if (extractedTitle == null || extractedTitle.trim().isEmpty()) {
+                extractedTitle = originalFilename.contains(".") ? originalFilename.substring(0, originalFilename.lastIndexOf(".")) : originalFilename;
+            }
+            if (extractedAuthor == null || extractedAuthor.trim().isEmpty()) {
+                extractedAuthor = "Unknown Author";
+            }
+            if (extractedDescription == null || extractedDescription.trim().isEmpty()) {
+                extractedDescription = "Imported into Yuki Tales from " + originalFilename + ".";
+            }
+            if (extractedCoverUrl == null || extractedCoverUrl.trim().isEmpty()) {
+                extractedCoverUrl = "/uploads/cover_solo_leveling.jpg";
+            }
+
+            if (targetNovel == null) {
+                targetNovel = new Novel(null, extractedTitle.trim(), extractedAuthor.trim(), extractedDescription.trim(), extractedCoverUrl.trim(), type.toUpperCase(), genre.trim(), 4.8, "ONGOING");
+                targetNovel.setCreatorId(loggedInUser.getId());
+                targetNovel.setYear(java.time.Year.now().getValue());
+                targetNovel.setSource("Imported File");
+                targetNovel = novelService.saveNovel(targetNovel);
+                syncNovelFoldersAndFiles(targetNovel);
+            }
+
+            double currentMaxNumber = 0.0;
+            List<Chapter> existingChapters = novelService.getChaptersByNovelId(targetNovel.getId());
+            if (existingChapters != null && !existingChapters.isEmpty()) {
+                for (Chapter c : existingChapters) {
+                    if (c.getChapterNumber() != null && c.getChapterNumber() > currentMaxNumber) {
+                        currentMaxNumber = c.getChapterNumber();
+                    }
+                }
+            }
+
+            int importedCount = 0;
+            for (Map<String, Object> chMap : parsedChapters) {
+                currentMaxNumber += 1.0;
+                String chTitle = (String) chMap.get("title");
+                if (chTitle == null || chTitle.trim().isEmpty()) {
+                    chTitle = "Chapter " + (int) currentMaxNumber;
+                }
+                String chContent = (String) chMap.get("content");
+                if (chContent == null || chContent.trim().isEmpty()) {
+                    continue;
+                }
+                Chapter ch = new Chapter(null, targetNovel, chTitle.trim(), currentMaxNumber, chContent.trim(), pricePerChapter);
+                ch.setPublishAt(java.time.LocalDateTime.now());
+                ch.setPublishNotificationSent(true);
+                Chapter savedCh = chapterServiceHelper(ch);
+                syncChapterFiles(savedCh);
+                importedCount++;
+            }
+
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "novelId", targetNovel.getId(),
+                "novelTitle", targetNovel.getTitle(),
+                "chapterCount", importedCount,
+                "message", "Successfully imported " + importedCount + " chapter(s) into '" + targetNovel.getTitle() + "'!"
+            ));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Import failed: " + e.getMessage()));
+        }
+    }
+
+    @PostMapping("/stories/import-server-dir")
+    public ResponseEntity<?> importServerDir(
+            @RequestParam(required = false) String directoryPath,
+            HttpSession session) {
+        if (isRestricted(session)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Platform is in secured mode."));
+        }
+        User loggedInUser = (User) session.getAttribute("user");
+        if (loggedInUser == null || (!"ADMIN".equals(loggedInUser.getUser_type()) && !"OWNER".equals(loggedInUser.getUser_type()))) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of("error", "Unauthorized access."));
+        }
+
+        String userDir = System.getProperty("user.dir");
+        Path targetDir = directoryPath != null && !directoryPath.trim().isEmpty() 
+            ? Paths.get(directoryPath.trim()) 
+            : Paths.get(userDir, "import");
+
+        if (!Files.exists(targetDir) || !Files.isDirectory(targetDir)) {
+            try {
+                Files.createDirectories(targetDir);
+            } catch (Exception e) {}
+            return ResponseEntity.ok(Map.of("success", true, "importedCount", 0, "message", "Import directory initialized at: " + targetDir.toAbsolutePath().toString() + ". Place .epub or .txt files inside and run import again."));
+        }
+
+        int totalNovels = 0;
+        int totalChapters = 0;
+        List<String> importedTitles = new java.util.ArrayList<>();
+
+        try (java.util.stream.Stream<Path> stream = Files.list(targetDir)) {
+            List<Path> files = stream.filter(Files::isRegularFile).toList();
+            Path importedDir = targetDir.resolve("imported");
+            Files.createDirectories(importedDir);
+
+            for (Path p : files) {
+                String fName = p.getFileName().toString();
+                String lower = fName.toLowerCase();
+                if (lower.endsWith(".epub") || lower.endsWith(".txt") || lower.endsWith(".zip")) {
+                    byte[] data = Files.readAllBytes(p);
+                    Map<String, Object> parseRes;
+                    if (lower.endsWith(".epub")) {
+                        parseRes = parseEpubArchive(new java.io.ByteArrayInputStream(data));
+                    } else if (lower.endsWith(".zip")) {
+                        parseRes = parseZipArchive(new java.io.ByteArrayInputStream(data), fName);
+                    } else {
+                        parseRes = parseTextChapters(new String(data, java.nio.charset.StandardCharsets.UTF_8), fName, "auto");
+                    }
+
+                    @SuppressWarnings("unchecked")
+                    List<Map<String, Object>> chaps = (List<Map<String, Object>>) parseRes.get("chapters");
+                    if (chaps != null && !chaps.isEmpty()) {
+                        String t = (String) parseRes.getOrDefault("title", fName);
+                        String a = (String) parseRes.getOrDefault("author", "Unknown Author");
+                        String d = (String) parseRes.getOrDefault("description", "Imported from server directory.");
+                        String c = (String) parseRes.getOrDefault("coverUrl", "/uploads/cover_solo_leveling.jpg");
+
+                        Novel nov = new Novel(null, t, a, d, c, "NOVEL", "Fantasy, Adventure", 4.8, "ONGOING");
+                        nov.setCreatorId(loggedInUser.getId());
+                        nov.setYear(java.time.Year.now().getValue());
+                        nov.setSource("Server Import");
+                        nov = novelService.saveNovel(nov);
+                        syncNovelFoldersAndFiles(nov);
+
+                        double cNum = 1.0;
+                        for (Map<String, Object> cMap : chaps) {
+                            String chTitle = (String) cMap.get("title");
+                            String chContent = (String) cMap.get("content");
+                            if (chContent != null && !chContent.trim().isEmpty()) {
+                                Chapter chapter = new Chapter(null, nov, chTitle, cNum, chContent, 0);
+                                chapter.setPublishAt(java.time.LocalDateTime.now());
+                                chapter.setPublishNotificationSent(true);
+                                Chapter savedCh = chapterServiceHelper(chapter);
+                                syncChapterFiles(savedCh);
+                                cNum += 1.0;
+                                totalChapters++;
+                            }
+                        }
+                        totalNovels++;
+                        importedTitles.add(t);
+
+                        Files.move(p, importedDir.resolve(fName), java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", "Error scanning directory: " + e.getMessage()));
+        }
+
+        return ResponseEntity.ok(Map.of(
+            "success", true,
+            "novelsCount", totalNovels,
+            "chaptersCount", totalChapters,
+            "importedTitles", importedTitles,
+            "message", "Successfully imported " + totalNovels + " novel(s) and " + totalChapters + " chapter(s) from server import directory!"
+        ));
+    }
+
+    private Map<String, Object> parseTextChapters(String text, String filename, String splitPattern) {
+        Map<String, Object> result = new java.util.HashMap<>();
+        List<Map<String, Object>> chapters = new java.util.ArrayList<>();
+
+        if (text == null || text.trim().isEmpty()) {
+            result.put("chapters", chapters);
+            return result;
+        }
+
+        String baseName = filename != null && filename.contains(".") ? filename.substring(0, filename.lastIndexOf(".")) : "Novel";
+        result.put("title", baseName);
+        result.put("author", "Unknown Author");
+
+        String[] lines = text.replace("\r\n", "\n").replace("\r", "\n").split("\n");
+        java.util.regex.Pattern chapterRegex = java.util.regex.Pattern.compile("(?i)^\\s*(?:chapter|ch\\.?|act|episode|volume\\s+\\d+\\s+chapter|prologue|epilogue)\\s*([0-9]+(?:\\.[0-9]+)?)?(?:\\s*[:\\-\\.]?\\s*(.*))?$");
+        java.util.regex.Pattern markdownHeader = java.util.regex.Pattern.compile("^\\s*#{1,3}\\s+(.*)$");
+
+        String currentTitle = "Prologue";
+        StringBuilder currentContent = new StringBuilder();
+        int chapterIdx = 1;
+
+        for (String line : lines) {
+            String trimmed = line.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+
+            java.util.regex.Matcher m = chapterRegex.matcher(trimmed);
+            java.util.regex.Matcher md = markdownHeader.matcher(trimmed);
+
+            boolean isHeader = false;
+            String headerTitle = null;
+
+            if (m.matches()) {
+                isHeader = true;
+                headerTitle = trimmed;
+            } else if (md.matches() && md.group(1).toLowerCase().contains("chapter")) {
+                isHeader = true;
+                headerTitle = md.group(1).trim();
+            }
+
+            if (isHeader) {
+                if (currentContent.length() > 0) {
+                    chapters.add(Map.of("title", currentTitle, "content", currentContent.toString()));
+                    currentContent = new StringBuilder();
+                }
+                currentTitle = headerTitle != null ? headerTitle : ("Chapter " + chapterIdx);
+                chapterIdx++;
+            } else {
+                currentContent.append("<p>").append(escapeHtml(trimmed)).append("</p>\n");
+            }
+        }
+
+        if (currentContent.length() > 0) {
+            chapters.add(Map.of("title", currentTitle, "content", currentContent.toString()));
+        }
+
+        if (chapters.isEmpty() && lines.length > 0) {
+            StringBuilder chunk = new StringBuilder();
+            int count = 0;
+            int cNum = 1;
+            for (String line : lines) {
+                String trimmed = line.trim();
+                if (trimmed.isEmpty()) continue;
+                chunk.append("<p>").append(escapeHtml(trimmed)).append("</p>\n");
+                count++;
+                if (count >= 50) {
+                    chapters.add(Map.of("title", "Chapter " + cNum, "content", chunk.toString()));
+                    chunk = new StringBuilder();
+                    count = 0;
+                    cNum++;
+                }
+            }
+            if (chunk.length() > 0) {
+                chapters.add(Map.of("title", "Chapter " + cNum, "content", chunk.toString()));
+            }
+        }
+
+        result.put("chapters", chapters);
+        return result;
+    }
+
+    private Map<String, Object> parseEpubArchive(java.io.InputStream inputStream) throws Exception {
+        Map<String, Object> result = new java.util.HashMap<>();
+        List<Map<String, Object>> chapters = new java.util.ArrayList<>();
+        Map<String, byte[]> files = new java.util.HashMap<>();
+
+        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(inputStream)) {
+            java.util.zip.ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = zis.read(buffer)) > 0) {
+                        baos.write(buffer, 0, len);
+                    }
+                    files.put(entry.getName().replace("\\", "/"), baos.toByteArray());
+                }
+                zis.closeEntry();
+            }
+        }
+
+        String opfPath = "OEBPS/content.opf";
+        if (files.containsKey("META-INF/container.xml")) {
+            String containerXml = new String(files.get("META-INF/container.xml"), java.nio.charset.StandardCharsets.UTF_8);
+            java.util.regex.Matcher m = java.util.regex.Pattern.compile("full-path=\"([^\"]+)\"").matcher(containerXml);
+            if (m.find()) {
+                opfPath = m.group(1);
+            }
+        }
+
+        String opfDir = opfPath.contains("/") ? opfPath.substring(0, opfPath.lastIndexOf("/") + 1) : "";
+        byte[] opfBytes = files.get(opfPath);
+        if (opfBytes == null) {
+            for (String key : files.keySet()) {
+                if (key.endsWith(".opf")) {
+                    opfBytes = files.get(key);
+                    opfDir = key.contains("/") ? key.substring(0, key.lastIndexOf("/") + 1) : "";
+                    break;
+                }
+            }
+        }
+
+        String title = "Imported EPUB Novel";
+        String author = "Unknown Author";
+        String description = "";
+        String coverUrl = null;
+
+        List<String> spineItemRefs = new java.util.ArrayList<>();
+        Map<String, String> manifest = new java.util.HashMap<>();
+
+        if (opfBytes != null) {
+            String opf = new String(opfBytes, java.nio.charset.StandardCharsets.UTF_8);
+            java.util.regex.Matcher titleMatcher = java.util.regex.Pattern.compile("<dc:title[^>]*>([^<]+)</dc:title>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(opf);
+            if (titleMatcher.find()) title = titleMatcher.group(1).trim();
+
+            java.util.regex.Matcher authorMatcher = java.util.regex.Pattern.compile("<dc:creator[^>]*>([^<]+)</dc:creator>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(opf);
+            if (authorMatcher.find()) author = authorMatcher.group(1).trim();
+
+            java.util.regex.Matcher descMatcher = java.util.regex.Pattern.compile("<dc:description[^>]*>([^<]+)</dc:description>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(opf);
+            if (descMatcher.find()) description = descMatcher.group(1).trim();
+
+            java.util.regex.Matcher itemMatcher = java.util.regex.Pattern.compile("<item[^>]+id=\"([^\"]+)\"[^>]+href=\"([^\"]+)\"", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(opf);
+            while (itemMatcher.find()) {
+                manifest.put(itemMatcher.group(1), itemMatcher.group(2));
+            }
+            java.util.regex.Matcher itemMatcher2 = java.util.regex.Pattern.compile("<item[^>]+href=\"([^\"]+)\"[^>]+id=\"([^\"]+)\"", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(opf);
+            while (itemMatcher2.find()) {
+                manifest.put(itemMatcher2.group(2), itemMatcher2.group(1));
+            }
+
+            java.util.regex.Matcher spineMatcher = java.util.regex.Pattern.compile("<itemref[^>]+idref=\"([^\"]+)\"", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(opf);
+            while (spineMatcher.find()) {
+                spineItemRefs.add(spineMatcher.group(1));
+            }
+        }
+
+        for (Map.Entry<String, byte[]> entry : files.entrySet()) {
+            String k = entry.getKey().toLowerCase();
+            if (k.contains("cover") && (k.endsWith(".jpg") || k.endsWith(".jpeg") || k.endsWith(".png") || k.endsWith(".webp"))) {
+                String ext = k.substring(k.lastIndexOf("."));
+                String uniqueName = "cover_" + UUID.randomUUID().toString() + ext;
+                File uploadsDir = new File(System.getProperty("user.dir"), "uploads");
+                uploadsDir.mkdirs();
+                Files.write(new File(uploadsDir, uniqueName).toPath(), entry.getValue());
+                coverUrl = "/uploads/" + uniqueName;
+                break;
+            }
+        }
+
+        int chapIndex = 1;
+        for (String idref : spineItemRefs) {
+            String href = manifest.get(idref);
+            if (href == null) continue;
+            String cleanHref = href.contains("#") ? href.substring(0, href.indexOf("#")) : href;
+            String fullPath = opfDir + cleanHref;
+            byte[] docBytes = files.get(fullPath);
+            if (docBytes == null) {
+                for (String k : files.keySet()) {
+                    if (k.endsWith(cleanHref)) {
+                        docBytes = files.get(k);
+                        break;
+                    }
+                }
+            }
+
+            if (docBytes != null) {
+                String docHtml = new String(docBytes, java.nio.charset.StandardCharsets.UTF_8);
+                String chapTitle = "Chapter " + chapIndex;
+                java.util.regex.Matcher hMatcher = java.util.regex.Pattern.compile("<h[1-3][^>]*>([^<]+)</h[1-3]>", java.util.regex.Pattern.CASE_INSENSITIVE).matcher(docHtml);
+                if (hMatcher.find()) {
+                    chapTitle = hMatcher.group(1).trim();
+                }
+
+                String bodyContent = docHtml;
+                java.util.regex.Matcher bodyMatcher = java.util.regex.Pattern.compile("<body[^>]*>(.*?)</body>", java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.DOTALL).matcher(docHtml);
+                if (bodyMatcher.find()) {
+                    bodyContent = bodyMatcher.group(1);
+                }
+
+                bodyContent = bodyContent.replaceAll("(?is)<script.*?</script>", "")
+                                         .replaceAll("(?is)<style.*?</style>", "");
+
+                String textOnly = bodyContent.replaceAll("<[^>]+>", "").trim();
+                if (textOnly.length() > 50) {
+                    chapters.add(Map.of("title", chapTitle, "content", bodyContent.trim()));
+                    chapIndex++;
+                }
+            }
+        }
+
+        result.put("title", title);
+        result.put("author", author);
+        result.put("description", description);
+        result.put("coverUrl", coverUrl);
+        result.put("chapters", chapters);
+        return result;
+    }
+
+    private Map<String, Object> parseZipArchive(java.io.InputStream inputStream, String filename) throws Exception {
+        Map<String, Object> result = new java.util.HashMap<>();
+        List<Map<String, Object>> chapters = new java.util.ArrayList<>();
+        Map<String, byte[]> textFiles = new java.util.TreeMap<>();
+        String coverUrl = null;
+
+        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(inputStream)) {
+            java.util.zip.ZipEntry entry;
+            while ((entry = zis.getNextEntry()) != null) {
+                if (!entry.isDirectory()) {
+                    String name = entry.getName().replace("\\", "/");
+                    String lower = name.toLowerCase();
+                    java.io.ByteArrayOutputStream baos = new java.io.ByteArrayOutputStream();
+                    byte[] buffer = new byte[8192];
+                    int len;
+                    while ((len = zis.read(buffer)) > 0) {
+                        baos.write(buffer, 0, len);
+                    }
+                    byte[] bytes = baos.toByteArray();
+
+                    if (lower.contains("cover") && (lower.endsWith(".jpg") || lower.endsWith(".png") || lower.endsWith(".webp"))) {
+                        String ext = lower.substring(lower.lastIndexOf("."));
+                        String uniqueName = "cover_" + UUID.randomUUID().toString() + ext;
+                        File uploadsDir = new File(System.getProperty("user.dir"), "uploads");
+                        uploadsDir.mkdirs();
+                        Files.write(new File(uploadsDir, uniqueName).toPath(), bytes);
+                        coverUrl = "/uploads/" + uniqueName;
+                    } else if (lower.endsWith(".txt") || lower.endsWith(".html") || lower.endsWith(".xhtml") || lower.endsWith(".md")) {
+                        textFiles.put(name, bytes);
+                    }
+                }
+                zis.closeEntry();
+            }
+        }
+
+        int cNum = 1;
+        for (Map.Entry<String, byte[]> entry : textFiles.entrySet()) {
+            String path = entry.getKey();
+            String fName = path.contains("/") ? path.substring(path.lastIndexOf("/") + 1) : path;
+            String chapTitle = fName.contains(".") ? fName.substring(0, fName.lastIndexOf(".")) : fName;
+            String text = new String(entry.getValue(), java.nio.charset.StandardCharsets.UTF_8);
+
+            String contentHtml = text;
+            if (!fName.toLowerCase().endsWith(".html") && !fName.toLowerCase().endsWith(".xhtml")) {
+                StringBuilder sb = new StringBuilder();
+                for (String line : text.replace("\r\n", "\n").split("\n")) {
+                    String t = line.trim();
+                    if (!t.isEmpty()) {
+                        sb.append("<p>").append(escapeHtml(t)).append("</p>\n");
+                    }
+                }
+                contentHtml = sb.toString();
+            }
+            if (!contentHtml.trim().isEmpty()) {
+                chapters.add(Map.of("title", chapTitle, "content", contentHtml));
+                cNum++;
+            }
+        }
+
+        String baseName = filename.contains(".") ? filename.substring(0, filename.lastIndexOf(".")) : filename;
+        result.put("title", baseName);
+        result.put("author", "Unknown Author");
+        result.put("coverUrl", coverUrl);
+        result.put("chapters", chapters);
+        return result;
+    }
+
+    private String escapeHtml(String text) {
+        if (text == null) return "";
+        return text.replace("&", "&amp;")
+                   .replace("<", "&lt;")
+                   .replace(">", "&gt;")
+                   .replace("\"", "&quot;");
+    }
+
 }
